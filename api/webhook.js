@@ -1,6 +1,5 @@
 // Vercel Serverless entrypoint for /webhook
-// Lazy-load controller to avoid hard failures on GET when optional deps missing
-let webhookController = null;
+const webhookController = require('../server/controllers/webhookController');
 
 module.exports = async (req, res) => {
   // CORS (optional)
@@ -43,9 +42,6 @@ module.exports = async (req, res) => {
   }
 
   try {
-    if (!webhookController) {
-      webhookController = require('../server/controllers/webhookController');
-    }
     // Reuse existing Express-style controller
     await webhookController.handleWebhook(req, res);
   } catch (err) {
