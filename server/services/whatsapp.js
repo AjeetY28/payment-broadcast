@@ -27,17 +27,21 @@ if (isTwilioConfigured) {
 /**
  * Send WhatsApp alert for payment
  * @param {Object} paymentData - Payment information
+ * @param {String} customMessage - Optional custom message (for invoices)
  * @returns {Promise<Object>} - Response from Twilio or mock response
  */
-async function sendWhatsAppAlert(paymentData) {
+async function sendWhatsAppAlert(paymentData, customMessage = null) {
   const { payment_id, customer_name, amount, currency = 'INR' } = paymentData;
 
-  const message = `💰 Payment Alert!\n\n` +
+  // Use custom message if provided (for invoices), otherwise use default
+  const message = customMessage || (
+    `💰 Payment Alert!\n\n` +
     `Payment ID: ${payment_id}\n` +
     `Customer: ${customer_name}\n` +
     `Amount: ${currency} ${amount}\n` +
     `Time: ${new Date().toLocaleString()}\n\n` +
-    `Thank you for your payment!`;
+    `Thank you for your payment!`
+  );
 
   // If Twilio is not configured, return mock response
   if (!isTwilioConfigured || !twilioClient) {

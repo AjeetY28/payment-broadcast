@@ -9,9 +9,11 @@ function App() {
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
+  const API_BASE = process.env.REACT_APP_API_BASE || '';
+
   const fetchPayments = async () => {
     try {
-      const response = await fetch('/logs');
+      const response = await fetch(`${API_BASE}/logs`);
       const data = await response.json();
       
       if (data.success) {
@@ -82,6 +84,7 @@ function App() {
       <footer className="App-footer">
         <p>Last updated: {lastUpdate.toLocaleTimeString()}</p>
         <p>Auto-refreshing every 5 seconds</p>
+        {API_BASE && (<p>API: {API_BASE}</p>)}
       </footer>
     </div>
   );

@@ -4,11 +4,16 @@ A full-stack payment monitoring system that automatically sends WhatsApp alerts 
 
 ## 🚀 Features
 
-- **Webhook Integration**: Receives payment notifications from Zoho Books
-- **WhatsApp Alerts**: Instant notifications via Twilio WhatsApp API (with mock mode fallback)
-- **Google Sheets Logging**: Automatic logging to Google Sheets (with CSV fallback)
+- **Zoho Books Integration**: Automatically receives invoice creation webhooks from Zoho Books
+- **Multi-Organization Support**: Supports multiple Zoho Books organizations
+  - Configure webhooks for each organization to the same `/webhook` URL; invoices from any org will send WhatsApp and be stored with Organization ID/Name
+- **Webhook Integration**: Receives payment notifications from Zoho Books or manual entries
+- **WhatsApp Alerts**: Instant notifications via Twilio WhatsApp API with invoice details (with mock mode fallback)
+- **Google Sheets Logging**: Automatic logging to Google Sheets with invoice data (with CSV fallback)
 - **Real-time Dashboard**: React-based dashboard with auto-refresh every 5 seconds
-- **Payment History**: View all payments with filtering and statistics
+- **Payment History**: View all payments and invoices with filtering and statistics
+- **Status-based Notifications**: Only sends WhatsApp when status is "paid" (Zoho `invoice.created` always sends invoice details)
+- **Manual Entry Support**: Add entries manually to Google Sheets with automatic notifications
 - **Lightweight & Deployable**: Ready for deployment on Vercel, Railway, or similar platforms
 
 ## 📁 Project Structure
@@ -120,7 +125,8 @@ Receives payment webhook from Zoho Books.
   "payment_id": "INV-2304",
   "customer_name": "Riya Mehta",
   "amount": 1200,
-  "currency": "INR"
+  "currency": "INR",
+  "status": "paid" // Only 'paid' triggers WhatsApp (except Zoho invoice.created)
 }
 ```
 
@@ -280,3 +286,18 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 For issues or questions, please open an issue on GitHub.
 
+## 🔔 Status-based Notifications
+
+- Only sends WhatsApp when `status` is `paid` (case-insensitive).
+- For Zoho Books `invoice.created` webhooks, the system sends an invoice summary WhatsApp message (invoice number, customer, amount, date) regardless of payment status.
+- Manual webhooks may include `status`. If omitted, it defaults to `paid` for backward compatibility.
+
+Example Zoho event payload snippet:
+
+```json
+{
+  "event": { "type": "invoice.created" },
+  "data": { "invoice": { "invoice_number": "INV-2304", "customer_name": "Riya", "total": 1200, "currency_code": "INR" } }
+}
+```
+- Multi-Org: Invoices from any configured Zoho organization are accepted. Sheet stores `Organization ID` and `Organization Name` when present in the webhook payload.

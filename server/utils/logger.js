@@ -4,6 +4,16 @@ const path = require('path');
 const LOG_DIR = path.join(__dirname, '../../logs');
 const CSV_FILE = path.join(LOG_DIR, 'payments.csv');
 
+const DEFAULT_HEADERS = [
+  'Payment ID', 'Customer Name', 'Amount', 'Currency', 'Timestamp', 'Status'
+];
+
+const EXTENDED_HEADERS = [
+  ...DEFAULT_HEADERS,
+  'Invoice ID', 'Invoice Number', 'Invoice Date', 'Source',
+  'Organization ID', 'Organization Name'
+];
+
 /**
  * Ensure logs directory exists
  */
@@ -26,7 +36,7 @@ async function ensureCSVFile() {
     // File exists
   } catch {
     // File doesn't exist, create it with headers
-    const headers = 'Payment ID,Customer Name,Amount,Currency,Timestamp,Status\n';
+    const headers = EXTENDED_HEADERS.join(',') + '\n';
     await fs.writeFile(CSV_FILE, headers, 'utf8');
   }
 }
@@ -40,7 +50,7 @@ async function logToCSV(paymentData) {
 
   const { payment_id, customer_name, amount, currency = 'INR' } = paymentData;
   const timestamp = new Date().toISOString();
-  const status = 'Processed';
+  const status = paymentData.status || 'Processed';
 
   // Escape commas and quotes in CSV
   const escapeCSV = (value) => {
@@ -52,14 +62,35 @@ async function logToCSV(paymentData) {
     return str;
   };
 
-  const row = [
+  // Determine header format of existing file
+  let useExtended = true;
+  try {
+    const existing = await fs.readFile(CSV_FILE, 'utf8');
+    const firstLine = existing.split('\n')[0] || '';
+    useExtended = firstLine.includes('Organization ID');
+  } catch {}
+
+  let values = [
     escapeCSV(payment_id),
     escapeCSV(customer_name),
     escapeCSV(amount),
     escapeCSV(currency),
     escapeCSV(timestamp),
     escapeCSV(status)
-  ].join(',') + '\n';
+  ];
+
+  if (useExtended) {
+    values = values.concat([
+      escapeCSV(paymentData.invoice_id || ''),
+      escapeCSV(paymentData.invoice_number || ''),
+      escapeCSV(paymentData.invoice_date || ''),
+      escapeCSV(paymentData.source || 'manual'),
+      escapeCSV(paymentData.organization_id || ''),
+      escapeCSV(paymentData.organization_name || '')
+    ]);
+  }
+
+  const row = values.join(',') + '\n';
 
   try {
     await fs.appendFile(CSV_FILE, row, 'utf8');
@@ -115,14 +146,28 @@ async function readFromCSV() {
       values.push(current); // Add last value
 
       if (values.length >= 6) {
-        payments.push({
+        const base = {
           payment_id: values[0],
           customer_name: values[1],
           amount: parseFloat(values[2]) || 0,
           currency: values[3] || 'INR',
           timestamp: values[4],
           status: values[5]
-        });
+        };
+
+        if (values.length >= 12) {
+          payments.push({
+            ...base,
+            invoice_id: values[6] || base.payment_id,
+            invoice_number: values[7] || base.payment_id,
+            invoice_date: values[8] || base.timestamp,
+            source: values[9] || 'manual',
+            organization_id: values[10] || null,
+            organization_name: values[11] || null
+          });
+        } else {
+          payments.push(base);
+        }
       }
     }
 

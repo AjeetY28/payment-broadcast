@@ -6,6 +6,7 @@ const logger = require('../utils/logger');
 
 const SHEET_ID = process.env.SHEET_ID;
 const GOOGLE_CREDS_PATH = process.env.GOOGLE_CREDS_PATH;
+const GOOGLE_CREDS_JSON = process.env.GOOGLE_CREDS_JSON; // Optional: JSON content for serverless (Vercel)
 
 let doc = null;
 let sheet = null;
@@ -15,16 +16,22 @@ let isGoogleSheetsConfigured = false;
  * Initialize Google Sheets connection
  */
 async function initializeGoogleSheets() {
-  if (!SHEET_ID || !GOOGLE_CREDS_PATH) {
+  if (!SHEET_ID || (!GOOGLE_CREDS_PATH && !GOOGLE_CREDS_JSON)) {
     console.warn('⚠️ Google Sheets credentials not found. Using CSV fallback.');
     return false;
   }
 
   try {
     // Check if credentials file exists
-    const credsPath = path.resolve(GOOGLE_CREDS_PATH);
-    const credsContent = await fs.readFile(credsPath, 'utf8');
-    const credentials = JSON.parse(credsContent);
+    let credentials;
+    if (GOOGLE_CREDS_JSON) {
+      // Prefer env var JSON for serverless platforms (e.g., Vercel)
+      credentials = JSON.parse(GOOGLE_CREDS_JSON);
+    } else {
+      const credsPath = path.resolve(GOOGLE_CREDS_PATH);
+      const credsContent = await fs.readFile(credsPath, 'utf8');
+      credentials = JSON.parse(credsContent);
+    }
 
     // Initialize JWT auth
     const serviceAccountAuth = new JWT({
@@ -59,7 +66,11 @@ async function initializeGoogleSheets() {
 async function ensureHeaders() {
   if (!sheet) return;
 
-  const requiredHeaders = ['Payment ID', 'Customer Name', 'Amount', 'Currency', 'Timestamp', 'Status'];
+  const requiredHeaders = [
+    'Payment ID', 'Customer Name', 'Amount', 'Currency', 'Timestamp', 'Status',
+    'Invoice ID', 'Invoice Number', 'Invoice Date', 'Source',
+    'Organization ID', 'Organization Name'
+  ];
   
   try {
     // Try to load existing header row
@@ -155,15 +166,39 @@ async function logPaymentToSheet(paymentData) {
       await sheet.loadHeaderRow();
     }
 
-    // Add row to Google Sheet
-    await sheet.addRow({
+    // Add row to Google Sheet with additional fields if available
+    const rowData = {
       'Payment ID': payment_id,
       'Customer Name': customer_name,
       'Amount': amount,
       'Currency': currency,
       'Timestamp': timestamp,
-      'Status': 'Processed'
-    });
+      'Status': paymentData.status || 'Processed'
+    };
+
+    // Add invoice fields if available (for Zoho Books)
+    if (paymentData.invoice_id) {
+      rowData['Invoice ID'] = paymentData.invoice_id;
+    }
+    if (paymentData.invoice_number) {
+      rowData['Invoice Number'] = paymentData.invoice_number;
+    }
+    if (paymentData.invoice_date) {
+      rowData['Invoice Date'] = paymentData.invoice_date;
+    }
+    if (paymentData.source) {
+      rowData['Source'] = paymentData.source;
+    }
+
+    // Organization fields if available
+    if (paymentData.organization_id) {
+      rowData['Organization ID'] = paymentData.organization_id;
+    }
+    if (paymentData.organization_name) {
+      rowData['Organization Name'] = paymentData.organization_name;
+    }
+
+    await sheet.addRow(rowData);
 
     console.log('✅ Payment logged to Google Sheets:', payment_id);
     return {
@@ -216,14 +251,23 @@ async function getAllPayments() {
                paymentId !== 'Payment ID' && 
                paymentId.toString().trim() !== '';
       })
-      .map(row => ({
-        payment_id: row.get('Payment ID'),
-        customer_name: row.get('Customer Name'),
-        amount: parseFloat(row.get('Amount')) || 0,
-        currency: row.get('Currency') || 'INR',
-        timestamp: row.get('Timestamp'),
-        status: row.get('Status')
-      }));
+      .map(row => {
+        const paymentId = row.get('Payment ID');
+        return {
+          payment_id: paymentId,
+          invoice_id: row.get('Invoice ID') || paymentId,
+          invoice_number: row.get('Invoice Number') || paymentId,
+          customer_name: row.get('Customer Name'),
+          amount: parseFloat(row.get('Amount')) || 0,
+          currency: row.get('Currency') || 'INR',
+          timestamp: row.get('Timestamp'),
+          invoice_date: row.get('Invoice Date') || row.get('Timestamp'),
+          status: row.get('Status'),
+          source: row.get('Source') || 'manual',
+          organization_id: row.get('Organization ID') || null,
+          organization_name: row.get('Organization Name') || null
+        };
+      });
 
     return payments;
   } catch (error) {
