@@ -1,7 +1,10 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-const LOG_DIR = path.join(__dirname, '../../logs');
+// Use writable temp dir on serverless platforms (e.g., Vercel), fallback to repo logs locally
+const IS_SERVERLESS = !!(process.env.VERCEL || process.env.AWS_REGION || process.env.LAMBDA_TASK_ROOT);
+const WRITABLE_DIR = process.env.TMPDIR || process.env.TEMP || process.env.TMP || '/tmp';
+const LOG_DIR = IS_SERVERLESS ? path.join(WRITABLE_DIR, 'plus-payment-logs') : path.join(__dirname, '../../logs');
 const CSV_FILE = path.join(LOG_DIR, 'payments.csv');
 
 const DEFAULT_HEADERS = [
@@ -37,7 +40,12 @@ async function ensureCSVFile() {
   } catch {
     // File doesn't exist, create it with headers
     const headers = EXTENDED_HEADERS.join(',') + '\n';
-    await fs.writeFile(CSV_FILE, headers, 'utf8');
+    try {
+      await fs.writeFile(CSV_FILE, headers, 'utf8');
+    } catch (err) {
+      // On read-only FS (serverless without tmp), surface a friendly error
+      throw new Error(`CSV log init failed: ${err.message}. On serverless, please set SHEET_ID + GOOGLE_CREDS_JSON to use Google Sheets.`);
+    }
   }
 }
 
