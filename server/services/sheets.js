@@ -1,5 +1,11 @@
-const { GoogleSpreadsheet } = require('google-spreadsheet');
-const { JWT } = require('google-auth-library');
+let GoogleSpreadsheet = null;
+let JWT = null;
+try {
+  ({ GoogleSpreadsheet } = require('google-spreadsheet'));
+  ({ JWT } = require('google-auth-library'));
+} catch (e) {
+  console.warn('⚠️ Google Sheets SDK not installed. Will use CSV fallback unless GOOGLE_CREDS_JSON present and modules available.');
+}
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
@@ -18,6 +24,11 @@ let isGoogleSheetsConfigured = false;
 async function initializeGoogleSheets() {
   if (!SHEET_ID || (!GOOGLE_CREDS_PATH && !GOOGLE_CREDS_JSON)) {
     console.warn('⚠️ Google Sheets credentials not found. Using CSV fallback.');
+    return false;
+  }
+
+  if (!GoogleSpreadsheet || !JWT) {
+    console.warn('⚠️ Google Sheets libraries not available. Using CSV fallback.');
     return false;
   }
 

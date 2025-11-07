@@ -1,5 +1,6 @@
 // Vercel Serverless entrypoint for /webhook
-const webhookController = require('../server/controllers/webhookController');
+// Lazy-load controller to avoid hard failures on GET when optional deps missing
+let webhookController = null;
 
 module.exports = async (req, res) => {
   // CORS (optional)
@@ -10,6 +11,17 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.statusCode = 200;
     return res.end();
+  }
+
+  // For convenience, make GET return a friendly message instead of error
+  if (req.method === 'GET') {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify({
+      ok: true,
+      route: 'webhook',
+      message: 'Send a POST with JSON body from Zoho Books to trigger.'
+    }));
   }
 
   if (req.method !== 'POST') {
@@ -31,6 +43,9 @@ module.exports = async (req, res) => {
   }
 
   try {
+    if (!webhookController) {
+      webhookController = require('../server/controllers/webhookController');
+    }
     // Reuse existing Express-style controller
     await webhookController.handleWebhook(req, res);
   } catch (err) {
@@ -38,4 +53,3 @@ module.exports = async (req, res) => {
     res.end(JSON.stringify({ success: false, error: 'Internal error', message: err.message }));
   }
 };
-

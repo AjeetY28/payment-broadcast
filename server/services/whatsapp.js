@@ -1,4 +1,9 @@
-const twilio = require('twilio');
+let twilio = null;
+try {
+  twilio = require('twilio');
+} catch (e) {
+  console.warn('⚠️ Twilio SDK not installed. Using mock mode.');
+}
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -9,7 +14,7 @@ const fromNumber = process.env.TWILIO_FROM_NUMBER;
 const toNumber = process.env.TWILIO_TO_NUMBER;
 
 // Check if Twilio credentials are available
-const isTwilioConfigured = accountSid && authToken && fromNumber && toNumber;
+const isTwilioConfigured = !!(twilio && accountSid && authToken && fromNumber && toNumber);
 
 let twilioClient = null;
 
