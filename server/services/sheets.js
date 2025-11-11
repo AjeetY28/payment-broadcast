@@ -6,7 +6,8 @@ const logger = require('../utils/logger');
 
 const SHEET_ID = process.env.SHEET_ID;
 const GOOGLE_CREDS_PATH = process.env.GOOGLE_CREDS_PATH;
-const GOOGLE_CREDS_JSON = process.env.GOOGLE_CREDS_JSON; // Optional: JSON content for serverless (Vercel)
+// Allow both GOOGLE_CREDS_JSON and GOOGLE_CREDENTIALS_JSON
+const GOOGLE_CREDS_JSON = process.env.GOOGLE_CREDS_JSON || process.env.GOOGLE_CREDENTIALS_JSON; // Optional: JSON content for serverless (Vercel)
 
 let doc = null;
 let sheet = null;

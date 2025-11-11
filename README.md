@@ -81,6 +81,8 @@ TWILIO_TO_NUMBER=+1234567890
 # Google Sheets Configuration (optional)
 SHEET_ID=your_google_sheet_id
 GOOGLE_CREDS_PATH=./credentials/google-credentials.json
+# Or, for Vercel/serverless, paste full JSON into an env var:
+# Either `GOOGLE_CREDS_JSON` or `GOOGLE_CREDENTIALS_JSON` (same behavior)
 ```
 
 **Note**: If Twilio or Google Sheets credentials are not provided, the system will automatically use mock/fallback modes:
