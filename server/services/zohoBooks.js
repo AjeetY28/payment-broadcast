@@ -49,6 +49,10 @@ function parseZohoBooksWebhook(webhookPayload) {
                   invoiceData.organization?.id ||
                   webhookPayload.event?.organization_id ||
                   webhookPayload.event?.org_id ||
+                  webhookPayload.event?.data?.organization_id ||
+                  webhookPayload.event?.data?.org_id ||
+                  webhookPayload.payload?.organization_id ||
+                  webhookPayload.payload?.org_id ||
                   null;
 
     const orgName = webhookPayload.organization_name ||
@@ -57,6 +61,13 @@ function parseZohoBooksWebhook(webhookPayload) {
                     invoiceData.organization_name ||
                     invoiceData.org_name ||
                     invoiceData.organization?.name ||
+                    webhookPayload.event?.organization_name ||
+                    webhookPayload.event?.org_name ||
+                    webhookPayload.event?.data?.organization_name ||
+                    webhookPayload.event?.data?.org_name ||
+                    webhookPayload.payload?.organization_name ||
+                    webhookPayload.payload?.org_name ||
+                    webhookPayload.company_name ||
                     null;
     const invoiceId = invoiceData.invoice_id || 
                      invoiceData.invoice_number || 
@@ -136,31 +147,95 @@ function parseZohoBooksWebhook(webhookPayload) {
  * @param {Object} paymentData - Payment data from invoice
  * @returns {String} - Formatted WhatsApp message
  */
-function formatInvoiceWhatsAppMessage(paymentData) {
-  const { invoice_id, invoice_number, customer_name, amount, currency, invoice_date } = paymentData;
+// function formatInvoiceWhatsAppMessage(paymentData) {
+//   const { invoice_id, invoice_number, customer_name, amount, currency, invoice_date } = paymentData;
   
+//   // Format date
+//   let formattedDate = invoice_date;
+//   try {
+//     const date = new Date(invoice_date);
+//     formattedDate = date.toLocaleDateString('en-IN', {
+//       year: 'numeric',
+//       month: 'short',
+//       day: 'numeric'
+//     });
+//   } catch (e) {
+//     // Use original date if parsing fails
+//   }
+
+//   const invoiceNumber = invoice_number || invoice_id || paymentData.payment_id;
+
+//   // Optional organization details
+//   const orgId = paymentData.organization_id;
+//   const orgName = paymentData.organization_name;
+//   let orgLines = '';
+//   if (orgName && orgId) {
+//     orgLines = `Organization: ${orgName} (${orgId})\n`;
+//   } else if (orgName) {
+//     orgLines = `Organization: ${orgName}\n`;
+//   } else if (orgId) {
+//     orgLines = `Organization ID: ${orgId}\n`;
+//   }
+
+//   const message = `🧾 New Invoice Created!\n\n` +
+//     `Invoice ID: ${invoiceNumber}\n` +
+//     `Customer: ${customer_name}\n` +
+//     (orgLines ? orgLines : '') +
+//     `Amount: ${currency} ${amount.toLocaleString('en-IN')}\n` +
+//     `Date: ${formattedDate}\n` +
+//     `Time: ${new Date().toLocaleString('en-IN')}\n\n` +
+//     `Invoice has been created in Zoho Books!`;
+
+//   return message;
+// }
+  /**
+ * Format WhatsApp message for Zoho Books invoice
+ * @param {Object} paymentData - Payment data from invoice
+ * @returns {String} - Formatted WhatsApp message
+ */
+function formatInvoiceWhatsAppMessage(paymentData) {
+  const {
+    invoice_id,
+    invoice_number,
+    customer_name,
+    amount,
+    currency,
+    invoice_date,
+    organization_id,
+    organization_name
+  } = paymentData;
+
+  // Safe fallbacks
+  const invNum = invoice_number || invoice_id || paymentData.payment_id || 'N/A';
+  const custName = customer_name || 'Unknown Customer';
+  const orgName = organization_name || 'N/A';
+  const orgId   = organization_id || 'N/A';
+  const curr    = currency || 'INR';
+  const amt     = (Number.isFinite(Number(amount)) ? Number(amount) : 0).toLocaleString('en-IN');
+
   // Format date
   let formattedDate = invoice_date;
   try {
     const date = new Date(invoice_date);
-    formattedDate = date.toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  } catch (e) {
-    // Use original date if parsing fails
+    if (!isNaN(date.getTime())) {
+      formattedDate = date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+  } catch (_) {
+    // keep original
   }
 
-  const invoiceNumber = invoice_number || invoice_id || paymentData.payment_id;
-  
-  const message = `🧾 New Invoice Created!\n\n` +
-    `Invoice ID: ${invoiceNumber}\n` +
-    `Customer: ${customer_name}\n` +
-    `Amount: ${currency} ${amount.toLocaleString('en-IN')}\n` +
-    `Date: ${formattedDate}\n` +
-    `Time: ${new Date().toLocaleString('en-IN')}\n\n` +
-    `Invoice has been created in Zoho Books!`;
+  const nowTime = new Date().toLocaleString('en-IN');
+
+  // Message (org info ALWAYS included)
+  const message =
+    `🧾 *New Invoice Created*\n` +
+    `• *Organization*: ${orgName} (ID: ${orgId})\n` +
+    `• *Invoice No*: ${invNum}\n` +
+    `• *Customer*: ${custName}\n` +
+    `• *Amount*: ${curr} ${amt}\n` +
+    `• *Date*: ${formattedDate}\n` +
+    `• *Time*: ${nowTime}\n\n` +
+    `✅ Invoice has been created in Zoho Books.`;
 
   return message;
 }

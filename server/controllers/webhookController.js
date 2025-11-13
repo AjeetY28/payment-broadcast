@@ -48,17 +48,82 @@ async function handleWebhook(req, res) {
 
       source = 'zoho_books';
       
-      // Format custom WhatsApp message for invoice (for created events)
+      // We'll build the WhatsApp message after enriching org details below
+      
+      // Fallback: capture organization details from headers/query if missing
+      try {
+        const h = Object.fromEntries(
+          Object.entries(headers || {}).map(([k, v]) => [k.toLowerCase(), v])
+        );
+        const q = req.query || {};
+
+        const orgIdHeader = h['x-zoho-orgid'] || h['x-zoho-organizationid'] || h['x-organization-id'] ||
+                            h['x-org-id'] || h['organization-id'] || h['org-id'] || null;
+        const orgNameHeader = h['x-organization-name'] || h['x-org-name'] || h['organization-name'] ||
+                              h['org-name'] || h['x-zoho-organization-name'] || null;
+
+        const orgIdQuery = q.organization_id || q.org_id || null;
+        const orgNameQuery = q.organization_name || q.org_name || null;
+
+        if (!paymentData.organization_id) {
+          paymentData.organization_id = orgIdHeader || orgIdQuery || paymentData.organization_id || null;
+        }
+        if (!paymentData.organization_name) {
+          paymentData.organization_name = orgNameHeader || orgNameQuery || paymentData.organization_name || null;
+        }
+
+        // Final fallback: environment defaults
+        if (!paymentData.organization_id) {
+          paymentData.organization_id = process.env.DEFAULT_ORGANIZATION_ID ||
+                                        process.env.ORGANIZATION_ID ||
+                                        process.env.ORG_ID || null;
+        }
+        if (!paymentData.organization_name) {
+          paymentData.organization_name = process.env.DEFAULT_ORGANIZATION_NAME ||
+                                          process.env.ORGANIZATION_NAME ||
+                                          process.env.ORG_NAME || null;
+        }
+
+        // Optional mapping: ORG_MAP_JSON or ORG_MAP ("id=name;id2=name2")
+        try {
+          let orgMap = {};
+          if (process.env.ORG_MAP_JSON) {
+            orgMap = JSON.parse(process.env.ORG_MAP_JSON);
+          } else if (process.env.ORG_MAP) {
+            const pairs = process.env.ORG_MAP.split(/;|\n|,/).map(s => s.trim()).filter(Boolean);
+            for (const p of pairs) {
+              const [id, name] = p.split(/=|:/);
+              if (id && name) orgMap[id.trim()] = name.trim();
+            }
+          }
+
+          // If we have ID but not name, derive from map
+          if (paymentData.organization_id && !paymentData.organization_name) {
+            paymentData.organization_name = orgMap[paymentData.organization_id] || paymentData.organization_name || null;
+          }
+          // If we have name but not ID, reverse lookup
+          if (!paymentData.organization_id && paymentData.organization_name) {
+            const found = Object.entries(orgMap).find(([, n]) => (n || '').toLowerCase() === paymentData.organization_name.toLowerCase());
+            if (found) paymentData.organization_id = found[0];
+          }
+        } catch (e) {
+          // ignore mapping errors
+        }
+      } catch (_) {}
+
+      // Now that paymentData is enriched with org details, build message
       if (isInvoiceCreatedEvent) {
         whatsappMessage = zohoBooksService.formatInvoiceWhatsAppMessage(paymentData);
       }
-      
+
       console.log('✅ Parsed Zoho Books invoice:', {
         invoice_id: paymentData.invoice_id,
         invoice_number: paymentData.invoice_number,
         customer: paymentData.customer_name,
         amount: paymentData.amount,
-        currency: paymentData.currency
+        currency: paymentData.currency,
+        organization_id: paymentData.organization_id,
+        organization_name: paymentData.organization_name
       });
     } else {
       // Manual webhook format (original format)
@@ -75,9 +140,9 @@ async function handleWebhook(req, res) {
       }
     }
 
-    // Keep provided status; do not force 'paid'. For manual payloads without status, allow fallback to 'paid'.
+    // Keep provided status; do not force 'paid'. For manual payloads without status, allow fallback to 'created'.
     if (!paymentData.status && source === 'manual') {
-      paymentData.status = 'paid';
+      paymentData.status = 'created';
     }
 
     // Add source and timestamp
@@ -94,7 +159,7 @@ async function handleWebhook(req, res) {
     // Decide whether to send WhatsApp alert
     let whatsappResult = { success: false, skipped: true, reason: 'status_filter' };
     const statusNorm = (paymentData.status || '').toString().toLowerCase();
-    const shouldSend = isInvoiceCreatedEvent || statusNorm === 'paid';
+    const shouldSend = isInvoiceCreatedEvent || statusNorm === 'created';
 
     if (shouldSend) {
       try {
