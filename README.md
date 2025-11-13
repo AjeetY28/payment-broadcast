@@ -303,3 +303,16 @@ Example Zoho event payload snippet:
 }
 ```
 - Multi-Org: Invoices from any configured Zoho organization are accepted. Sheet stores `Organization ID` and `Organization Name` when present in the webhook payload.
+## ?? Vercel Deployment (Monorepo Ready)
+
+This repository now ships with a "vercel.json" and an "api/index.js" bridge, so one Vercel project can host both the Express API and the React dashboard:
+
+1. **Push the repo** to GitHub/GitLab/Bitbucket.
+2. **Import into Vercel**. It will detect:
+   - `api/index.js` ? built with `@vercel/node`, exposing your Express app at `/api/*`.
+   - `client/package.json` ? built with `@vercel/static-build`, outputting the React app from `client/build`.
+3. **Configure environment variables** in the Vercel dashboard using the same keys as `server/.env` (`SHEET_ID`, `GOOGLE_CREDS_JSON`, `TWILIO_*`, `DEFAULT_CURRENCY`, etc.). Paste credential JSON directly into env vars when needed.
+4. **Frontend API base** – by default the React app calls `/api` in production. Optionally set `REACT_APP_API_BASE=https://yourdomain.vercel.app/api`.
+5. **Deploy**. `/` serves the dashboard, `/api/*` hits the Express routes (`/api/webhook`, `/api/logs`, `/api/dashboard`, `/api/health`).
+
+> Running the background Google Sheets monitor isn’t supported on serverless platforms, so it automatically stays disabled on Vercel. Use a long-running host if you need sheet polling.

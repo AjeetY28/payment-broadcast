@@ -1,109 +1,127 @@
 import React from 'react';
 import './PaymentList.css';
 
-function PaymentList({ payments, loading, error, onRefresh }) {
-  const formatCurrency = (amount, currency = 'INR') => {
-    return new Intl.NumberFormat('en-IN', {
+const statusClassMap = {
+  processed: 'status-processed',
+  paid: 'status-processed',
+  completed: 'status-processed',
+  pending: 'status-pending',
+  overdue: 'status-overdue',
+  failed: 'status-failed',
+  issue: 'status-issue'
+};
+
+const normalizeStatusKey = status => (status || 'processed').toLowerCase();
+
+const formatCurrency = (amount, currency = 'GBP') => {
+  if (amount === null || amount === undefined) return '—';
+  const numericAmount = Number(amount) || 0;
+  try {
+    return new Intl.NumberFormat('en-GB', {
       style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    }).format(amount);
-  };
-
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    const date = new Date(timestamp);
-    return date.toLocaleString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  if (error) {
-    return (
-      <div className="PaymentList">
-        <div className="payment-list-header">
-          <h2>Payment History</h2>
-          <button onClick={onRefresh} className="refresh-btn">
-            🔄 Refresh
-          </button>
-        </div>
-        <div className="error-message">
-          <p>❌ {error}</p>
-          <button onClick={onRefresh} className="retry-btn">
-            Retry
-          </button>
-        </div>
-      </div>
-    );
+      currency,
+      maximumFractionDigits: 0
+    }).format(numericAmount);
+  } catch (error) {
+    return `${currency} ${numericAmount.toLocaleString('en-GB')}`;
   }
+};
 
-  if (loading && payments.length === 0) {
-    return (
-      <div className="PaymentList">
-        <div className="payment-list-header">
-          <h2>Payment History</h2>
-        </div>
-        <div className="loading-message">
-          <p>Loading payments...</p>
-        </div>
-      </div>
-    );
-  }
+const formatDate = timestamp => {
+  if (!timestamp) return 'N/A';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+function PaymentList({ payments, loading, error, onRefresh }) {
+  const hasPayments = payments && payments.length > 0;
+
+  const renderTable = () => (
+    <div className="payment-table-container">
+      <table className="payment-table">
+        <thead>
+          <tr>
+            <th>Invoice</th>
+            <th>Customer</th>
+            <th>Amount</th>
+            <th>Source</th>
+            <th>Timestamp</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {payments.map((payment, index) => {
+            const statusKey = normalizeStatusKey(payment.status);
+            return (
+              <tr key={payment.payment_id || index} className={index === 0 ? 'latest' : ''}>
+                <td className="payment-id">
+                  <span>{payment.payment_id || payment.invoice_number}</span>
+                  <small>{payment.invoice_number && payment.invoice_number !== payment.payment_id ? payment.invoice_number : ''}</small>
+                </td>
+                <td className="customer-cell">
+                  <p className="customer-name">{payment.customer_name || 'Unknown Customer'}</p>
+                  {payment.organization_name && (
+                    <span className="customer-org">{payment.organization_name}</span>
+                  )}
+                </td>
+                <td className="amount">{formatCurrency(payment.amount, payment.currency)}</td>
+                <td className="source">{payment.source || 'N/A'}</td>
+                <td className="timestamp">{formatDate(payment.timestamp)}</td>
+                <td>
+                  <span className={`status-pill ${statusClassMap[statusKey] || 'status-default'}`}>
+                    {payment.status || 'Processed'}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
-    <div className="PaymentList">
+    <section className="PaymentList card">
       <div className="payment-list-header">
-        <h2>Payment History</h2>
-        <button onClick={onRefresh} className="refresh-btn">
-          🔄 Refresh
+        <div>
+          <p className="eyebrow">Payment Activity</p>
+          <h2>Payment Timeline</h2>
+          <p className="subtitle">Live feed of invoices coming from Zoho + manual entries</p>
+        </div>
+        <button onClick={onRefresh} className="refresh-btn" disabled={loading}>
+          {loading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 
-      {payments.length === 0 ? (
-        <div className="empty-state">
-          <p>📭 No payments recorded yet</p>
-          <p className="empty-subtitle">Payments will appear here when received via webhook</p>
-        </div>
-      ) : (
-        <div className="payment-table-container">
-          <table className="payment-table">
-            <thead>
-              <tr>
-                <th>Payment ID</th>
-                <th>Customer Name</th>
-                <th>Amount</th>
-                <th>Currency</th>
-                <th>Timestamp</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.map((payment, index) => (
-                <tr key={index} className={index === 0 ? 'latest-payment' : ''}>
-                  <td className="payment-id">{payment.payment_id}</td>
-                  <td className="customer-name">{payment.customer_name}</td>
-                  <td className="amount">{formatCurrency(payment.amount, payment.currency)}</td>
-                  <td className="currency">{payment.currency}</td>
-                  <td className="timestamp">{formatDate(payment.timestamp)}</td>
-                  <td>
-                    <span className={`status-badge ${payment.status?.toLowerCase() || 'processed'}`}>
-                      {payment.status || 'Processed'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {error && (
+        <div className="state-message error">
+          <p>{error}</p>
+          <button onClick={onRefresh}>Retry</button>
         </div>
       )}
-    </div>
+
+      {!error && loading && !hasPayments && (
+        <div className="state-message">
+          <p>Loading payments…</p>
+        </div>
+      )}
+
+      {!loading && !error && !hasPayments && (
+        <div className="state-message">
+          <p>No payments yet</p>
+          <p className="muted">Entries created via webhook or manual sheets sync will appear here.</p>
+        </div>
+      )}
+
+      {!error && hasPayments && renderTable()}
+    </section>
   );
 }
 
 export default PaymentList;
-

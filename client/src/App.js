@@ -1,94 +1,111 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import Dashboard from './components/Dashboard';
 import PaymentList from './components/PaymentList';
 
 function App() {
   const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [paymentsError, setPaymentsError] = useState(null);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
 
-  const API_BASE = process.env.REACT_APP_API_BASE || '';
+  const [summary, setSummary] = useState(null);
+  const [summaryError, setSummaryError] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
 
-  const fetchPayments = async () => {
+  const [lastUpdate, setLastUpdate] = useState(null);
+
+  const getApiBase = () => {
+    if (process.env.REACT_APP_API_BASE) {
+      return process.env.REACT_APP_API_BASE;
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return '/api';
+    }
+    return 'http://localhost:3001';
+  };
+
+  const API_BASE = getApiBase();
+
+  const fetchPayments = useCallback(async () => {
+    setPaymentsLoading(true);
     try {
       const response = await fetch(`${API_BASE}/logs`);
+      if (!response.ok) {
+        throw new Error(`Logs request failed (${response.status})`);
+      }
+
       const data = await response.json();
-      
       if (data.success) {
         setPayments(data.payments || []);
-        setLastUpdate(new Date());
-        setError(null);
+        setPaymentsError(null);
       } else {
-        setError(data.error || 'Failed to fetch payments');
+        throw new Error(data.error || 'Failed to fetch payments');
       }
     } catch (err) {
       console.error('Error fetching payments:', err);
-      setError('Failed to connect to server');
+      setPaymentsError(err.message || 'Failed to connect to server');
     } finally {
-      setLoading(false);
+      setPaymentsLoading(false);
     }
-  };
+  }, [API_BASE]);
+
+  const fetchSummary = useCallback(async () => {
+    setSummaryLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/dashboard`);
+      if (!response.ok) {
+        throw new Error(`Dashboard request failed (${response.status})`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setSummary(data.summary || null);
+        setSummaryError(null);
+      } else {
+        throw new Error(data.error || 'Failed to build dashboard summary');
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard summary:', err);
+      setSummaryError(err.message || 'Failed to connect to server');
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, [API_BASE]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.allSettled([fetchSummary(), fetchPayments()]);
+    setLastUpdate(new Date());
+  }, [fetchSummary, fetchPayments]);
 
   useEffect(() => {
-    // Initial fetch
-    fetchPayments();
-
-    // Auto-refresh every 5 seconds
-    const interval = setInterval(fetchPayments, 5000);
+    refreshAll();
+    const interval = setInterval(() => {
+      refreshAll();
+    }, 45000);
 
     return () => clearInterval(interval);
-  }, []);
-
-  // Calculate statistics
-  const stats = {
-    total: payments.length,
-    totalAmount: payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
-    todayCount: payments.filter(p => {
-      const paymentDate = new Date(p.timestamp);
-      const today = new Date();
-      return paymentDate.toDateString() === today.toDateString();
-    }).length,
-    todayAmount: payments
-      .filter(p => {
-        const paymentDate = new Date(p.timestamp);
-        const today = new Date();
-        return paymentDate.toDateString() === today.toDateString();
-      })
-      .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
-  };
+  }, [refreshAll]);
 
   return (
     <div className="App">
-      <header className="App-header">
-        <h1>💰 Plus Payment Alert System</h1>
-        <p className="subtitle">Real-time Payment Monitoring Dashboard</p>
-      </header>
-
-      <main className="App-main">
-        <Dashboard 
-          stats={stats} 
-          loading={loading}
+      <div className="App-content">
+        <Dashboard
+          summary={summary}
+          loading={summaryLoading}
+          error={summaryError}
           lastUpdate={lastUpdate}
+          onRefresh={refreshAll}
         />
-        
-        <PaymentList 
-          payments={payments} 
-          loading={loading}
-          error={error}
-          onRefresh={fetchPayments}
-        />
-      </main>
 
-      <footer className="App-footer">
-        <p>Last updated: {lastUpdate.toLocaleTimeString()}</p>
-        <p>Auto-refreshing every 5 seconds</p>
-        {API_BASE && (<p>API: {API_BASE}</p>)}
-      </footer>
+        <PaymentList
+          payments={payments}
+          loading={paymentsLoading}
+          error={paymentsError}
+          onRefresh={refreshAll}
+        />
+      </div>
     </div>
   );
 }
 
 export default App;
-
