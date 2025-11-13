@@ -22,19 +22,8 @@ async function initializeGoogleSheets() {
     return false;
   }
 
-  
-
   try {
-    // Check if credentials file exists
-    let credentials;
-    if (GOOGLE_CREDS_JSON) {
-      // Prefer env var JSON for serverless platforms (e.g., Vercel)
-      credentials = JSON.parse(GOOGLE_CREDS_JSON);
-    } else {
-      const credsPath = path.resolve(GOOGLE_CREDS_PATH);
-      const credsContent = await fs.readFile(credsPath, 'utf8');
-      credentials = JSON.parse(credsContent);
-    }
+    const credentials = await loadGoogleCredentials();
 
     // Initialize JWT auth
     const serviceAccountAuth = new JWT({
@@ -61,6 +50,39 @@ async function initializeGoogleSheets() {
     console.warn('⚠️ Falling back to CSV logging.');
     return false;
   }
+}
+
+async function loadGoogleCredentials() {
+  if (GOOGLE_CREDS_JSON) {
+    const raw = GOOGLE_CREDS_JSON.trim();
+    try {
+      return normalizeServiceAccount(JSON.parse(raw));
+    } catch (jsonError) {
+      try {
+        const decoded = Buffer.from(raw, 'base64').toString('utf8');
+        return normalizeServiceAccount(JSON.parse(decoded));
+      } catch (parseError) {
+        throw new Error(`Invalid GOOGLE_CREDS_JSON/GOOGLE_CREDENTIALS_JSON value: ${parseError.message}`);
+      }
+    }
+  }
+
+  const credsPath = path.resolve(GOOGLE_CREDS_PATH);
+  const credsContent = await fs.readFile(credsPath, 'utf8');
+  return normalizeServiceAccount(JSON.parse(credsContent));
+}
+
+function normalizeServiceAccount(credentials) {
+  if (!credentials || typeof credentials !== 'object') {
+    throw new Error('Service account credentials must be an object');
+  }
+
+  if (typeof credentials.private_key === 'string') {
+    // Handle escaped newlines (common when stored in env vars)
+    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+  }
+
+  return credentials;
 }
 
 /**

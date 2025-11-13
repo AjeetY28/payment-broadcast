@@ -83,6 +83,10 @@ SHEET_ID=your_google_sheet_id
 GOOGLE_CREDS_PATH=./credentials/google-credentials.json
 # Or, for Vercel/serverless, paste full JSON into an env var:
 # Either `GOOGLE_CREDS_JSON` or `GOOGLE_CREDENTIALS_JSON` (same behavior)
+# Value can be:
+#   • Raw JSON pasted directly (multi-line supported)
+#   • JSON on a single line with escaped newlines (\\n)
+#   • Base64-encoded JSON (will be decoded automatically)
 ```
 
 **Note**: If Twilio or Google Sheets credentials are not provided, the system will automatically use mock/fallback modes:
@@ -204,9 +208,10 @@ Health check endpoint.
 2. Enable Google Sheets API
 3. Create a Service Account and download credentials JSON
 4. Create a Google Sheet and share it with the service account email
-5. Add credentials to `.env`:
+5. Add credentials to `.env` (choose one approach):
    - `SHEET_ID`: The ID from your Google Sheet URL
-   - `GOOGLE_CREDS_PATH`: Path to your credentials JSON file
+   - `GOOGLE_CREDS_PATH`: Path to your credentials JSON file (for local/dev servers)
+   - `GOOGLE_CREDS_JSON` or `GOOGLE_CREDENTIALS_JSON`: Paste the full service account JSON (supports raw JSON, JSON with `\n`, or Base64). Recommended for Vercel/serverless.
 
 **Note**: Without Google Sheets credentials, the system automatically logs to `logs/payments.csv`.
 
@@ -237,25 +242,14 @@ Or using a tool like Postman or Insomnia.
 
 ## 🚀 Deployment
 
-### Deploy Backend (Railway/Vercel)
-
-1. **Railway**:
-   - Connect your GitHub repository
-   - Set environment variables in Railway dashboard
-   - Deploy the `server` directory
-
-2. **Vercel**:
-   - Install Vercel CLI: `npm i -g vercel`
-   - In the `server` directory: `vercel`
-   - Set environment variables in Vercel dashboard
-
-### Deploy Frontend (Vercel)
+### Deploy to Vercel
 
 1. Install Vercel CLI: `npm i -g vercel`
-2. In the `client` directory: `vercel`
-3. Update API URL in `client/src/App.js` if needed
+2. From the project root: `vercel` (creates a preview deployment)
+3. Set environment variables in the Vercel dashboard (Project → Settings → Environment Variables)
+4. Promote to production when ready: `vercel --prod`
 
-**Note**: Remember to update the API endpoint URL in the frontend if deploying to different domains.
+The provided `vercel.json` builds both the React client (`client/`) and the serverless API routes (`api/` + `server/`).
 
 ## 📝 Environment Variables Summary
 
@@ -267,7 +261,8 @@ Or using a tool like Postman or Insomnia.
 | `TWILIO_FROM_NUMBER` | No | Twilio WhatsApp number |
 | `TWILIO_TO_NUMBER` | No | Recipient WhatsApp number |
 | `SHEET_ID` | No | Google Sheet ID |
-| `GOOGLE_CREDS_PATH` | No | Path to Google credentials JSON |
+| `GOOGLE_CREDS_PATH` | No | Path to Google credentials JSON (legacy/local) |
+| `GOOGLE_CREDS_JSON` / `GOOGLE_CREDENTIALS_JSON` | No | Service account JSON content (recommended for Vercel) |
 
 ## 🐛 Troubleshooting
 
@@ -312,7 +307,7 @@ This repository now ships with a "vercel.json" and an "api/index.js" bridge, so 
    - `api/index.js` ? built with `@vercel/node`, exposing your Express app at `/api/*`.
    - `client/package.json` ? built with `@vercel/static-build`, outputting the React app from `client/build`.
 3. **Configure environment variables** in the Vercel dashboard using the same keys as `server/.env` (`SHEET_ID`, `GOOGLE_CREDS_JSON`, `TWILIO_*`, `DEFAULT_CURRENCY`, etc.). Paste credential JSON directly into env vars when needed.
-4. **Frontend API base** � by default the React app calls `/api` in production. Optionally set `REACT_APP_API_BASE=https://yourdomain.vercel.app/api`.
+4. **Frontend API base** � by default the React app calls `/api` in production. Optionally set `REACT_APP_API_BASE=https://yourdomain.vercel.app/api`.
 5. **Deploy**. `/` serves the dashboard, `/api/*` hits the Express routes (`/api/webhook`, `/api/logs`, `/api/dashboard`, `/api/health`).
 
-> Running the background Google Sheets monitor isn�t supported on serverless platforms, so it automatically stays disabled on Vercel. Use a long-running host if you need sheet polling.
+> Running the background Google Sheets monitor isn�t supported on serverless platforms, so it automatically stays disabled on Vercel. Use a long-running host if you need sheet polling.
