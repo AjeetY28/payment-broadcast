@@ -36,10 +36,9 @@ async function initializeGoogleSheets() {
     doc = new GoogleSpreadsheet(SHEET_ID, serviceAccountAuth);
     await doc.loadInfo();
 
-    // Get or create the first sheet
+    
     sheet = doc.sheetsByIndex[0] || (await doc.addSheet({ title: 'Payments' }));
 
-    // Ensure headers exist
     await ensureHeaders();
 
     isGoogleSheetsConfigured = true;
