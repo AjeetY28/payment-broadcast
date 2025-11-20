@@ -25,11 +25,28 @@ Recommended approach (secure)
   .\scripts\vercel-setup.ps1
   ```
 
+
 What the script does
 - Encodes `server/credentials/google-credentials.json` to base64
 - Adds a Vercel secret named `google-creds`
 - Attempts to add an environment variable `GOOGLE_CREDS_JSON` referencing the secret
 - Runs `vercel --prod` to deploy the project
+
+Important: Vercel Project Settings vs `vercel.json`
+- If `vercel.json` contains a `builds` array, Vercel will ignore the Build & Development Settings in the Project Settings UI and use the `builds` configuration from the file. If you prefer to manage build settings in the Vercel dashboard (Build Command, Output Directory, Root Directory), remove the `builds` array from `vercel.json`.
+- This repository's `vercel.json` has been updated to remove `builds` so you can use the Project Settings UI to configure builds.
+
+How to configure Project Settings (recommended when `vercel.json` has no `builds`):
+1. Open Vercel Dashboard → your Project → Settings → General.
+2. Under "Root Directory" set: `client` (so Vercel will run builds inside the `client` folder).
+3. Under "Build & Output Settings" set:
+  - Build Command: `npm run build`
+  - Output Directory: `build`
+4. Save changes and trigger a new deployment (via CLI `vercel --prod` or Dashboard "Redeploy").
+
+Notes
+- With `builds` removed, Vercel will auto-detect serverless functions placed under the top-level `api/` directory and build them automatically.
+- If you prefer to keep `vercel.json` with `builds`, you can — but Vercel will then ignore the UI project build settings. Choose one approach and keep it consistent.
 
 Manual alternative (UI)
 1. Go to your Vercel Project → Settings → Git → Environment Variables.
