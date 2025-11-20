@@ -71,10 +71,11 @@ function tryListen(startPort, maxAttempts = 5) {
     server.on('listening', () => {
       const addr = server.address();
       const usedPort = typeof addr === 'string' ? addr : addr.port;
+      const baseUrl = process.env.SERVER_BASE_URL || `http://localhost:${usedPort}`;
       console.log(`\u001b[32m✅ Server running on port ${usedPort}\u001b[0m`);
-      console.log(`Health check: http://localhost:${usedPort}/health`);
-      console.log(`Webhook endpoint: http://localhost:${usedPort}/webhook`);
-      console.log(`Logs endpoint: http://localhost:${usedPort}/logs`);
+      console.log(`Health check: ${baseUrl}/health`);
+      console.log(`Webhook endpoint: ${baseUrl}/webhook`);
+      console.log(`Logs endpoint: ${baseUrl}/logs`);
       // Only start monitor after server successfully starts
       startSheetMonitorIfNeeded();
     });

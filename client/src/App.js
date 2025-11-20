@@ -15,16 +15,11 @@ function App() {
   const [lastUpdate, setLastUpdate] = useState(null);
 
   const getApiBase = () => {
-    if (process.env.REACT_APP_API_BASE) {
-      return process.env.REACT_APP_API_BASE;
-    }
-    if (process.env.NODE_ENV === 'production') {
-      return '/api';
-    }
-    return 'http://localhost:3001';
+    // Always use REACT_APP_API_BASE from .env, fallback to '/api' if not set
+    return process.env.REACT_APP_API_BASE || '/api';
   };
 
-  const API_BASE = getApiBase();
+  const API_BASE = process.env.REACT_APP_API_BASE || '/api';
 
   const fetchPayments = useCallback(async () => {
     setPaymentsLoading(true);

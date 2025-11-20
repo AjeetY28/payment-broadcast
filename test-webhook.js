@@ -15,8 +15,8 @@ const testPayment = {
 const data = JSON.stringify(testPayment);
 
 const options = {
-  hostname: 'localhost',
-  port: 3001,
+  hostname: process.env.TEST_API_HOST || 'localhost',
+  port: process.env.TEST_API_PORT || 3001,
   path: '/webhook',
   method: 'POST',
   headers: {
