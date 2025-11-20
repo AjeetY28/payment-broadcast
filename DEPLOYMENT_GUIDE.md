@@ -47,6 +47,26 @@ How to configure Project Settings (recommended when `vercel.json` has no `builds
 Notes
 - With `builds` removed, Vercel will auto-detect serverless functions placed under the top-level `api/` directory and build them automatically.
 - If you prefer to keep `vercel.json` with `builds`, you can — but Vercel will then ignore the UI project build settings. Choose one approach and keep it consistent.
+ 
+New environment variables
+- `REACT_APP_API_BASE` (client): set this in `client/.env` or as an env var at build time. Example values:
+  - Development: `http://localhost:3001`
+  - Production (serverless via Vercel): `/api`
+
+- `SERVER_BASE_URL` (server): optional. If set, the server will report this value as its `baseUrl` in `/health`. Useful when your server is behind a proxy or has a public domain. Example: `https://your-deploy.vercel.app`
+
+Examples (local)
+- `client/.env`:
+  ```text
+  REACT_APP_API_BASE=http://localhost:3001
+  ```
+- `server/.env`:
+  ```text
+  PORT=3001
+  SERVER_BASE_URL=http://localhost:3001
+  ENABLE_SHEET_MONITORING=false
+  ```
+
 
 Manual alternative (UI)
 1. Go to your Vercel Project → Settings → Git → Environment Variables.

@@ -23,7 +23,12 @@ app.post('/webhook', webhookController.handleWebhook);
 app.get('/logs', logsController.getLogs);
 app.get('/dashboard', dashboardController.getSummary);
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  // Determine the server base URL. Prefer explicit env var, otherwise derive from request.
+  const explicitBase = process.env.SERVER_BASE_URL && process.env.SERVER_BASE_URL.trim();
+  const derivedBase = `${req.protocol}://${req.get('host')}`;
+  const baseUrl = explicitBase || derivedBase;
+
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), baseUrl });
 });
 
 // Error handling middleware
@@ -50,20 +55,58 @@ function startSheetMonitor() {
   }, 5000); // Wait 5 seconds for sheets to initialize
 }
 
-function startServer() {
-  app.listen(PORT, () => {
-    console.log(`�Ys? Server running on port ${PORT}`);
-    console.log(`�Y"S Health check: http://localhost:${PORT}/health`);
-    console.log(`�Y"� Webhook endpoint: http://localhost:${PORT}/webhook`);
-    console.log(`�Y"< Logs endpoint: http://localhost:${PORT}/logs`);
-  });
-  startSheetMonitor();
+function startSheetMonitorIfNeeded() {
+  if (!isServerless) {
+    startSheetMonitor();
+  }
+}
+
+function tryListen(startPort, maxAttempts = 5) {
+  let attempt = 0;
+
+  function listenOn(port) {
+    attempt += 1;
+    const server = app.listen(port);
+
+    server.on('listening', () => {
+      const addr = server.address();
+      const usedPort = typeof addr === 'string' ? addr : addr.port;
+      console.log(`\u001b[32m✅ Server running on port ${usedPort}\u001b[0m`);
+      console.log(`Health check: http://localhost:${usedPort}/health`);
+      console.log(`Webhook endpoint: http://localhost:${usedPort}/webhook`);
+      console.log(`Logs endpoint: http://localhost:${usedPort}/logs`);
+      // Only start monitor after server successfully starts
+      startSheetMonitorIfNeeded();
+    });
+
+    server.on('error', (err) => {
+      if (err && err.code === 'EADDRINUSE') {
+        console.warn(`⚠️ Port ${port} is already in use.`);
+        if (attempt < maxAttempts) {
+          const nextPort = port + 1;
+          console.log(`Trying next port: ${nextPort} (attempt ${attempt + 1}/${maxAttempts})`);
+          // Small delay before retrying
+          setTimeout(() => listenOn(nextPort), 300);
+        } else {
+          console.error(`❌ All ${maxAttempts} attempts failed. Port ${startPort}..${port} are in use. Exiting.`);
+          process.exit(1);
+        }
+      } else {
+        console.error('Server error:', err);
+        process.exit(1);
+      }
+    });
+  }
+
+  listenOn(startPort);
 }
 
 if (require.main === module) {
-  startServer();
-} else if (!isServerless) {
-  startSheetMonitor();
+  tryListen(PORT, 5);
+} else {
+  // When required as a module (e.g., in serverless), don't start a listening server here.
+  // But if running in a traditional environment where VERCEL isn't set, start monitor.
+  startSheetMonitorIfNeeded();
 }
 
 module.exports = app;
