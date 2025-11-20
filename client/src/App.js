@@ -14,10 +14,6 @@ function App() {
 
   const [lastUpdate, setLastUpdate] = useState(null);
 
-  const getApiBase = () => {
-    // Always use REACT_APP_API_BASE from .env, fallback to '/api' if not set
-    return process.env.REACT_APP_API_BASE || '/api';
-  };
 
   const API_BASE = process.env.REACT_APP_API_BASE || '/api';
 
