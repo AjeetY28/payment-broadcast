@@ -61,6 +61,28 @@ async function loadGoogleCredentials() {
         const decoded = Buffer.from(raw, 'base64').toString('utf8');
         return normalizeServiceAccount(JSON.parse(decoded));
       } catch (parseError) {
+        // If parsing the env var failed, try falling back to credential file paths
+        if (GOOGLE_CREDS_PATH) {
+          try {
+            const credsPath = path.resolve(GOOGLE_CREDS_PATH);
+            const credsContent = await fs.readFile(credsPath, 'utf8');
+            return normalizeServiceAccount(JSON.parse(credsContent));
+          } catch (fileErr) {
+            throw new Error(`Invalid GOOGLE_CREDS_JSON and failed to read file at GOOGLE_CREDS_PATH: ${fileErr.message}`);
+          }
+        }
+
+        // Also try GOOGLE_APPLICATION_CREDENTIALS if set (common pattern)
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+          try {
+            const appCredsPath = path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+            const appCredsContent = await fs.readFile(appCredsPath, 'utf8');
+            return normalizeServiceAccount(JSON.parse(appCredsContent));
+          } catch (appFileErr) {
+            throw new Error(`Invalid GOOGLE_CREDS_JSON and failed to read file at GOOGLE_APPLICATION_CREDENTIALS: ${appFileErr.message}`);
+          }
+        }
+
         throw new Error(`Invalid GOOGLE_CREDS_JSON/GOOGLE_CREDENTIALS_JSON value: ${parseError.message}`);
       }
     }
